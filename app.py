@@ -5,10 +5,10 @@ import PyPDF2
 import google.generativeai as genai
 
 # ─── CONFIG & BACKGROUND ──────────────────────────────────────────────────────
-load_dotenv()
-API_KEY = os.getenv("GEMINI_API_KEY")
-if not API_KEY:
-    st.error("❌ GEMINI_API_KEY missing in .env")
+try:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+except KeyError:
+    st.error("❌ GEMINI_API_KEY not found in Streamlit secrets")
     st.stop()
 
 st.set_page_config(page_title="CareerCraft ATS Tracker", layout="wide", page_icon="📄")
