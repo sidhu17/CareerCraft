@@ -1,0 +1,5 @@
+venv/
+__pycache__/
+*.pyc
+*.json  # Especially your service account file! Never upload it.
+.env
