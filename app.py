@@ -66,7 +66,7 @@ st.markdown("---")
 
 offer_img, offer_text = st.columns([1,2])
 with offer_img:
-    st.image("https://i.imgur.com/Q8KX8kH.png", use_column_width=True)
+    st.image("https://i.imgur.com/Q8KX8kH.png", use_container_width=True)
 with offer_text:
     st.subheader("🚀 Wide Range of Offerings")
     st.markdown(
@@ -112,7 +112,7 @@ with col1:
             st.write(result)
 
 with col2:
-    st.image("https://i.imgur.com/vzVfP9j.png", caption="Your career path", use_column_width=True)
+    st.image("https://i.imgur.com/vzVfP9j.png", caption="Your career path", use_container_width=True)
 
 st.markdown("---")
 
@@ -133,7 +133,7 @@ with faq_col2:
     st.write("**Q:** Can I deploy my own?") 
     st.write("A: Absolutely—just fork the GitHub repo and configure `.env`.") 
 with faq_col1:
-    st.image("https://i.imgur.com/6RSZ7Bx.png", caption="Need help?", use_column_width=True)
+    st.image("https://i.imgur.com/6RSZ7Bx.png", caption="Need help?", use_container_width=True)
 
 # ─── FOOTER / HOSTING INSTRUCTIONS ────────────────────────────────────────────
 
