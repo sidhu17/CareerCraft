@@ -49,7 +49,7 @@ with intro_col:
         """
     )
 with img_col:
-    st.image("images/intro.png", width=200)  # max width 200px
+    st.image("images/icon_dashboard.png", width=200)  # max width 200px
 
 st.markdown("---")
 
