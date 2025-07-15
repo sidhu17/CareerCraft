@@ -57,7 +57,7 @@ with img_col:
     st.image(
         "https://i.imgur.com/8fK4h6x.png",
         caption="Career at a glance",
-        use_column_width=True
+        use_container_width=True
     )
 
 st.markdown("---")
