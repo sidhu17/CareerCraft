@@ -12,16 +12,6 @@ if not API_KEY:
     st.stop()
 
 st.set_page_config(page_title="CareerCraft ATS Tracker", layout="wide", page_icon="📄")
-# Green page background
-st.markdown(
-    """
-    <style>
-      .stApp { background-color: #2ecc71; }
-      .block-container { padding: 2rem; background: none; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
 
 # configure Gemini
 genai.configure(api_key=API_KEY)
