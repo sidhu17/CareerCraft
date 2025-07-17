@@ -3,6 +3,7 @@ import streamlit as st
 from dotenv import load_dotenv
 import PyPDF2
 import google.generativeai as genai
+from PIL import Image
 
 # ─── CONFIG & BACKGROUND ──────────────────────────────────────────────────────
 try:
@@ -17,6 +18,12 @@ st.set_page_config(page_title="CareerCraft ATS Tracker", layout="wide", page_ico
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
+# ─── IMAGE HELPER ──────────────────────────────────────────────────────────────
+def load_and_resize(path: str, size: tuple[int,int]) -> Image.Image:
+    """Load image from disk and resize to `size` (width, height)."""
+    img = Image.open(path)
+    return img.resize(size)
+
 # ─── HELPERS ──────────────────────────────────────────────────────────────────
 def get_gemini_response(prompt: str) -> str:
     return model.generate_content(prompt).text
@@ -26,7 +33,7 @@ def input_pdf_text(pdf_file) -> str:
     return "".join(page.extract_text() or "" for page in reader.pages)
 
 # ─── 1. INTRODUCTION ───────────────────────────────────────────────────────────
-intro_col, img_col = st.columns([3,1], gap="large")
+intro_col, img_col = st.columns([3, 1], gap="large")
 with intro_col:
     st.title("🎯 CareerCraft")
     st.header("ATS‑Optimized Resume Analyzer")
@@ -39,14 +46,16 @@ with intro_col:
         """
     )
 with img_col:
-    st.image("images/icon_dashboard.png", width=200)  # max width 200px
+    # uniform 200×200px icon
+    st.image(load_and_resize("images/icon_dashboard.png", (200, 200)))
 
 st.markdown("---")
 
 # ─── 2. OFFERINGS ──────────────────────────────────────────────────────────────
-offer_img, offer_text = st.columns([1,2], gap="medium")
+offer_img, offer_text = st.columns([1, 2], gap="medium")
 with offer_img:
-    st.image("images/offerings.png", width=180)  # max width 180px
+    # uniform 180×180px offering graphic
+    st.image(load_and_resize("images/offerings.png", (180, 180)))
 with offer_text:
     st.subheader("🚀 Wide Range of Offerings")
     st.markdown(
@@ -84,7 +93,8 @@ with col1:
                 st.markdown("### 📊 Analysis Result")
                 st.write(get_gemini_response(prompt))
 with col2:
-    st.image("images/analysis.png", width=240)  # max width 240px
+    # uniform 240×180px analysis graphic
+    st.image(load_and_resize("images/analysis.png", (240, 180)))
 
 st.markdown("---")
 
@@ -101,4 +111,5 @@ with faq_col2:
     st.write("**Q:** Can I deploy my own?") 
     st.write("A: Absolutely—just fork the GitHub repo and configure `.env`.") 
 with faq_col1:
-    st.image("images/faq.png", width=200)  # max width 200px
+    # uniform 200×200px FAQ graphic
+    st.image(load_and_resize("images/faq.png", (200, 200)))
