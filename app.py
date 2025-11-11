@@ -1,18 +1,21 @@
-# app.py — CareerCraft ATS Tracker (Streamlit + Gemini)
-# - Reads API key from Streamlit Secrets first, then .env (local)
-# - Auto-discovers an available Gemini model and pings it
-# - Safe PDF text extraction + prompt size guard
+# app.py — CareerCraft ATS Tracker (Streamlit + Google GenAI SDK)
+# - Uses the new google-genai client (GA)
+# - Reads API key from Streamlit Secrets first, then env (.env for local)
+# - Tries a list of model names (2.0 first, then 1.5 fallbacks) with a quick ping
+# - Safe PDF text extraction + prompt truncation
 # - Safe image loading (won’t crash if file missing)
-# - Built-in diagnostics expander to debug keys/models
 
-import os
 from typing import Tuple, Optional
+import os
 
 import streamlit as st
 from dotenv import load_dotenv
-import google.generativeai as genai
-import PyPDF2
 from PIL import Image
+import PyPDF2
+
+# NEW SDK
+from google import genai
+from google.genai import types
 
 # ───────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG
@@ -25,7 +28,7 @@ st.set_page_config(page_title="CareerCraft ATS Tracker", layout="wide", page_ico
 load_dotenv()  # enables local development with .env
 
 def _get_api_key() -> Optional[str]:
-    # Prefer Streamlit Secrets (Cloud), then .env (local)
+    # Prefer Streamlit Secrets (Cloud), then env (local)
     return (
         st.secrets.get("GEMINI_API_KEY")
         or st.secrets.get("GOOGLE_API_KEY")
@@ -38,80 +41,36 @@ if not API_KEY:
     st.error("❌ No API key found. Set `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in Streamlit Secrets or .env")
     st.stop()
 
-genai.configure(api_key=API_KEY)
+# You can omit api_key=... if you export GEMINI_API_KEY in the environment.
+client = genai.Client(api_key=API_KEY)
 
 # ───────────────────────────────────────────────────────────────────────────────
-# DIAGNOSTICS (shows where key came from, SDK version, and visible models)
+# MODEL INIT (prefer 2.0, then 1.5 fallbacks). We "ping" to catch NOT_FOUND early.
 # ───────────────────────────────────────────────────────────────────────────────
-def _mask(k: str) -> str:
-    return (k[:6] + "…") if k and len(k) > 6 else "(none)"
+PREFERRED_MODELS = [
+    "gemini-2.0-flash",     # latest (preferred)
+    "gemini-1.5-pro",       # fallback
+    "gemini-1.5-flash",     # fallback
+    "gemini-1.0-pro",       # last resort
+]
 
-API_KEY_SOURCE = (
-    "st.secrets[GEMINI_API_KEY]" if "GEMINI_API_KEY" in st.secrets else
-    "st.secrets[GOOGLE_API_KEY]" if "GOOGLE_API_KEY" in st.secrets else
-    "os.getenv(GEMINI_API_KEY)" if os.getenv("GEMINI_API_KEY") else
-    "os.getenv(GOOGLE_API_KEY)" if os.getenv("GOOGLE_API_KEY") else
-    "(missing)"
-)
-
-with st.expander("🔎 Gemini diagnostics"):
-    st.write({"api_key_source": API_KEY_SOURCE, "api_key_sample": _mask(API_KEY)})
-    try:
-        # google-generativeai exposes __version__ on the module
-        st.write({"google-generativeai": getattr(genai, "__version__", "(unknown)")})
-    except Exception:
-        pass
-    # List visible models (if permitted)
-    try:
-        names = []
-        for m in genai.list_models():
-            if "generateContent" in getattr(m, "supported_generation_methods", []):
-                names.append(getattr(m, "name", ""))
-        st.write({"available_models": sorted(names)})
-    except Exception as e:
-        st.warning("Could not list models (this is fine in some environments).")
-        st.exception(e)
-
-# ───────────────────────────────────────────────────────────────────────────────
-# MODEL SELECTION (auto-pick a working model for this key)
-# ───────────────────────────────────────────────────────────────────────────────
-def pick_available_model() -> str:
-    prefs = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-8b", "gemini-1.0-pro"]
-    try:
-        avail = []
-        for m in genai.list_models():
-            if "generateContent" in getattr(m, "supported_generation_methods", []):
-                name = getattr(m, "name", "")
-                if name:
-                    avail.append(name)
-        # Prefer by our list
-        for p in prefs:
-            if p in avail:
-                return p
-        # Fallback to first generative model if present
-        if avail:
-            return avail[0]
-    except Exception:
-        # If listing fails (some envs), probe common names directly
-        pass
-
-    for p in ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"]:
+def pick_working_model() -> str:
+    last_exc = None
+    for name in PREFERRED_MODELS:
         try:
-            genai.GenerativeModel(p).generate_content("ping")
-            return p
-        except Exception:
+            # Lightweight ping request
+            _ = client.models.generate_content(model=name, contents="ping")
+            return name
+        except Exception as e:
+            last_exc = e
             continue
-
-    raise RuntimeError("No usable Gemini model for this API key.")
+    raise RuntimeError(f"No usable model. Tried: {PREFERRED_MODELS}. Last error: {last_exc}")
 
 try:
-    MODEL_NAME = pick_available_model()
+    MODEL_NAME = pick_working_model()
     st.info(f"Using model: **{MODEL_NAME}**")
-    model = genai.GenerativeModel(MODEL_NAME)
-    # Quick ping to surface NOT_FOUND immediately
-    _ = model.generate_content("ping")
 except Exception as e:
-    st.error("❌ Could not initialize a Gemini model. (Model name / key / quota / region issue.)")
+    st.error("❌ Could not initialize a Gemini model (model name / key / quota / region issue).")
     st.exception(e)
     st.stop()
 
@@ -160,8 +119,16 @@ def truncate(text: str, max_chars: int = 15000) -> str:
 
 def get_gemini_response(prompt: str) -> str:
     try:
-        resp = model.generate_content(prompt)
-        return getattr(resp, "text", "") or "No text returned."
+        resp = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            # Example config—tweak as you like or remove entirely
+            config=types.GenerateContentConfig(
+                max_output_tokens=1200,
+                temperature=0.6,
+            ),
+        )
+        return resp.text or "No text returned."
     except Exception as e:
         st.error("⚠️ Gemini request failed (often model name / quota / prompt size).")
         st.exception(e)
